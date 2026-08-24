@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="az">
+
+<head>
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Şəkil paylaşımı</title>
+
+<style>
+
+body {
+    font-family: Arial, sans-serif;
+    max-width: 500px;
+    margin: 40px auto;
+    padding: 20px;
+}
+
+button {
+    width: 100%;
+    padding: 15px;
+    margin: 8px 0;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+}
+
+video {
+    width: 100%;
+    border-radius: 12px;
+    margin-top: 15px;
+}
+
+.notice {
+    background: #eee;
+    padding: 15px;
+    border-radius: 10px;
+    line-height: 1.5;
+}
+
+</style>
+</head>
+
+<body>
+
+<h2>📸 Şəkil paylaşımı</h2>
+
+<div class="notice">
+
+Bu səhifə yalnız sizin açıq razılığınız
+ilə kamera və ya ekran görüntüsü göndərir.
+
+İcazə verməsəniz heç bir görüntü göndərilməyəcək.
+
+</div>
+
+<button onclick="startCamera()">
+📷 Kameraya icazə ver
+</button>
+
+<video id="video" autoplay playsinline style="display:none"></video>
+
+<button id="takePhoto" onclick="takePhoto()" style="display:none">
+📸 Şəkil çək və göndər
+</button>
+
+<hr>
+
+<button onclick="shareScreen()">
+🖥️ Ekranı paylaş
+</button>
+
+<p id="status"></p>
+
+<script>
+
+const token = "{{ token }}";
+
+let cameraStream = null;
+
+function status(text) {
+    document.getElementById("status").innerText = text;
+}
+
+async function startCamera() {
+
+    try {
+
+        cameraStream =
+            await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: false
+            });
+
+        const video =
+            document.getElementById("video");
+
+        video.srcObject = cameraStream;
+
+        video.style.display = "block";
+
+        document.getElementById("takePhoto")
+            .style.display = "block";
+
+        status("Kamera açıldı.");
+
+    } catch (error) {
+
+        status("Kamera icazəsi verilmədi.");
+
+    }
+
+}
+
+function takePhoto() {
+
+    const video =
+        document.getElementById("video");
+
+    const canvas =
+        document.createElement("canvas");
+
+    canvas.width =
+        video.videoWidth || 640;
+
+    canvas.height =
+        video.videoHeight || 480;
+
+    canvas.getContext("2d")
+        .drawImage(
+            video,
+            0,
+            0,
+            canvas.width,
+            canvas.height
+        );
+
+    canvas.toBlob(
+        blob => upload(blob, "camera"),
+        "image/jpeg",
+        0.9
+    );
+
+}
+
+async function shareScreen() {
+
+    try {
+
+        const stream =
+            await navigator.mediaDevices.getDisplayMedia({
+                video: true
+            });
+
+        const video =
+            document.createElement("video");
+
+        video.srcObject = stream;
+
+        await video.play();
+
+        await new Promise(
+            resolve =>
+            video.onloadedmetadata = resolve
+        );
+
+        const canvas =
+            document.createElement("canvas");
+
+        canvas.width =
+            video.videoWidth || 1280;
+
+        canvas.height =
+            video.videoHeight || 720;
+
+        canvas.getContext("2d")
+            .drawImage(
+                video,
+                0,
+                0,
+                canvas.width,
+                canvas.height
+            );
+
+        stream.getTracks()
+            .forEach(track => track.stop());
+
+        canvas.toBlob(
+            blob => upload(blob, "screen"),
+            "image/jpeg",
+            0.9
+        );
+
+    } catch (error) {
+
+        status("Ekran paylaşımı ləğv edildi.");
+
+    }
+
+}
+
+async function upload(blob, kind) {
+
+    status("Göndərilir...");
+
+    const form = new FormData();
+
+    form.append(
+        "image",
+        blob,
+        "capture.jpg"
+    );
+
+    form.append(
+        "kind",
+        kind
+    );
+
+    const response =
+        await fetch(
+            "/upload/" + token,
+            {
+                method: "POST",
+                body: form
+            }
+        );
+
+    const result =
+        await response.json();
+
+    if (result.ok) {
+
+        status("✅ Görüntü Telegram-a göndərildi.");
+
+    } else {
+
+        status(
+            "❌ " +
+            (result.error || "Xəta baş verdi.")
+        );
+
+    }
+
+}
+
+</script>
+
+</body>
+</html>
